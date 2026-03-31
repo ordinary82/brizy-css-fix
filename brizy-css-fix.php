@@ -3,7 +3,7 @@
  * Plugin Name: Brizy CSS Fix
  * Plugin URI: https://github.com/ordinary82/brizy-css-fix
  * Description: Fixes broken layouts after Brizy 2.8.8+ updates by restoring missing CSS files and providing per-page compiled data clearing.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Powerful Perceptions
  * Author URI: https://github.com/ordinary82
  * GitHub Plugin URI: ordinary82/brizy-css-fix
@@ -34,6 +34,7 @@ class Brizy_CSS_Fix {
         add_action('admin_init', [__CLASS__, 'maybe_copy_css']);
         add_action('add_meta_boxes', [__CLASS__, 'add_meta_box']);
         add_action('admin_notices', [__CLASS__, 'handle_clear_action']);
+        add_action('admin_notices', [__CLASS__, 'stale_css_warning']);
     }
 
     /**
@@ -126,7 +127,14 @@ class Brizy_CSS_Fix {
 
         echo '<p style="margin-bottom:8px;">';
         if ($has_compiled) {
-            echo '<span style="color:#00a32a;">&#10003;</span> Compiled data exists';
+            $compiled = get_post_meta($post->ID, 'brizy-compiled-sections', true);
+            $is_stale = is_string($compiled) && (strpos($compiled, 'preview.min.css') !== false || strpos($compiled, 'preview.pro.min.css') !== false);
+
+            if ($is_stale) {
+                echo '<span style="color:#dba617;">&#9888;</span> Compiled data has stale CSS references — working via workaround, resave in Brizy editor for permanent fix';
+            } else {
+                echo '<span style="color:#00a32a;">&#10003;</span> Compiled data is up to date';
+            }
         } else {
             echo '<span style="color:#d63638;">&#10007;</span> No compiled data — page will be blank until resaved in Brizy editor';
         }
@@ -149,6 +157,7 @@ class Brizy_CSS_Fix {
         if (!current_user_can('edit_post', $post_id)) return;
 
         $deleted = delete_post_meta($post_id, 'brizy-compiled-sections');
+        delete_transient('brizy_css_fix_stale_count');
         $title = get_the_title($post_id);
 
         if ($deleted) {
@@ -156,6 +165,34 @@ class Brizy_CSS_Fix {
         } else {
             echo '<div class="notice notice-warning is-dismissible"><p>No compiled data found for <strong>' . esc_html($title) . '</strong>.</p></div>';
         }
+    }
+    /**
+     * Show dashboard warning if any pages have stale CSS references.
+     */
+    public static function stale_css_warning() {
+        if (!current_user_can('manage_options')) return;
+
+        $transient = get_transient('brizy_css_fix_stale_count');
+        if ($transient === false) {
+            global $wpdb;
+            $count = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = %s AND (meta_value LIKE %s OR meta_value LIKE %s)",
+                'brizy-compiled-sections',
+                '%preview.min.css%',
+                '%preview.pro.min.css%'
+            ));
+            set_transient('brizy_css_fix_stale_count', $count, HOUR_IN_SECONDS);
+        } else {
+            $count = (int) $transient;
+        }
+
+        if ($count === 0) return;
+
+        $s = $count === 1 ? '' : 's';
+        echo '<div class="notice notice-warning">';
+        echo '<p><strong>Brizy CSS Fix:</strong> ' . $count . ' page' . $s . ' still referencing outdated CSS files. ';
+        echo 'These pages are working thanks to the workaround CSS files, but should be resaved in the Brizy editor for a permanent fix.</p>';
+        echo '</div>';
     }
 }
 
