@@ -3,7 +3,7 @@
  * Plugin Name: Brizy CSS Fix
  * Plugin URI: https://github.com/ordinary82/brizy-css-fix
  * Description: Fixes broken layouts after Brizy 2.8.8+ updates by restoring missing CSS files and providing per-page compiled data clearing.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Powerful Perceptions
  * Author URI: https://github.com/ordinary82
  * GitHub Plugin URI: ordinary82/brizy-css-fix
@@ -31,6 +31,8 @@ class Brizy_CSS_Fix {
         register_activation_hook(__FILE__, [__CLASS__, 'on_activate']);
         register_deactivation_hook(__FILE__, [__CLASS__, 'on_deactivate']);
 
+        if (!self::brizy_installed()) return;
+
         add_action('admin_init', [__CLASS__, 'maybe_copy_css']);
         add_action('add_meta_boxes', [__CLASS__, 'add_meta_box']);
         add_action('admin_notices', [__CLASS__, 'handle_clear_action']);
@@ -38,9 +40,17 @@ class Brizy_CSS_Fix {
     }
 
     /**
+     * Check if Brizy is installed (active or inactive).
+     */
+    private static function brizy_installed() {
+        return file_exists(WP_PLUGIN_DIR . '/brizy/brizy.php');
+    }
+
+    /**
      * On activation: copy CSS files and store the current Brizy version.
      */
     public static function on_activate() {
+        if (!self::brizy_installed()) return;
         self::copy_css_files();
         self::store_brizy_version();
     }
