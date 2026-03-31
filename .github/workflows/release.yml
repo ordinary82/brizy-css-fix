@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build plugin zip
+        run: |
+          mkdir brizy-css-fix
+          cp brizy-css-fix.php brizy-css-fix/
+          zip -r brizy-css-fix.zip brizy-css-fix/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: brizy-css-fix.zip
+          generate_release_notes: true
