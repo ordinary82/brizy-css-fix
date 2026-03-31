@@ -3,9 +3,9 @@
  * Plugin Name: Brizy CSS Fix
  * Plugin URI: https://github.com/ordinary82/brizy-css-fix
  * Description: Fixes broken layouts after Brizy 2.8.8+ updates by restoring missing CSS files and providing per-page compiled data clearing.
- * Version: 1.2.0
- * Author: Powerful Perceptions
- * Author URI: https://github.com/ordinary82
+ * Version: 1.2.1
+ * Author: dustin.com.au
+ * Author URI: https://dustin.com.au
  * GitHub Plugin URI: ordinary82/brizy-css-fix
  * Primary Branch: main
  * Requires at least: 5.0
