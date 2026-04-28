@@ -3,7 +3,7 @@
  * Plugin Name: Brizy CSS Fix
  * Plugin URI: https://github.com/ordinary82/brizy-css-fix
  * Description: Fixes broken layouts after Brizy 2.8.8+ updates by restoring missing CSS files and providing per-page compiled data clearing.
- * Version: 1.2.3
+ * Version: 1.3.0
  * Author: dustin.com.au
  * Author URI: https://dustin.com.au
  * GitHub Plugin URI: ordinary82/brizy-css-fix
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 class Brizy_CSS_Fix {
 
-    const VERSION = '1.2.3';
+    const VERSION = '1.3.0';
 
     private static $css_maps = [
         [
@@ -85,6 +85,7 @@ class Brizy_CSS_Fix {
             self::copy_css_files();
             self::store_brizy_version();
             update_option('brizy_css_fix_plugin_version', self::VERSION);
+            delete_transient('brizy_css_fix_stale_count');
         }
     }
 
@@ -144,12 +145,12 @@ class Brizy_CSS_Fix {
         echo '<p style="margin-bottom:8px;">';
         if ($has_compiled) {
             $compiled = get_post_meta($post->ID, 'brizy-compiled-sections', true);
-            $is_stale = is_string($compiled) && (strpos($compiled, 'preview.min.css') !== false || strpos($compiled, 'preview.pro.min.css') !== false);
+            $is_stale = self::compiled_data_is_stale($compiled);
 
             if ($is_stale) {
-                echo '<span style="color:#dba617;">&#9888;</span> Compiled data has stale CSS references — working via workaround, resave in Brizy editor for permanent fix';
+                echo '<span style="color:#dba617;">&#9888;</span> Compiled by older Brizy version — using workaround CSS. Resave in Brizy editor for a permanent fix.';
             } else {
-                echo '<span style="color:#00a32a;">&#10003;</span> Compiled data is up to date';
+                echo '<span style="color:#00a32a;">&#10003;</span> Compiled data references current CSS files';
             }
         } else {
             echo '<span style="color:#d63638;">&#10007;</span> No compiled data — page will be blank until resaved in Brizy editor';
@@ -183,7 +184,7 @@ class Brizy_CSS_Fix {
         }
     }
     /**
-     * Show dashboard warning if any pages have stale CSS references.
+     * Show dashboard warning if any pages were compiled by an older Brizy version.
      */
     public static function stale_css_warning() {
         if (!current_user_can('manage_options')) return;
@@ -191,12 +192,14 @@ class Brizy_CSS_Fix {
         $transient = get_transient('brizy_css_fix_stale_count');
         if ($transient === false) {
             global $wpdb;
-            $count = (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = %s AND (meta_value LIKE %s OR meta_value LIKE %s)",
-                'brizy-compiled-sections',
-                '%preview.min.css%',
-                '%preview.pro.min.css%'
+            $rows = $wpdb->get_col($wpdb->prepare(
+                "SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = %s",
+                'brizy-compiled-sections'
             ));
+            $count = 0;
+            foreach ($rows as $val) {
+                if (self::compiled_data_is_stale($val)) $count++;
+            }
             set_transient('brizy_css_fix_stale_count', $count, HOUR_IN_SECONDS);
         } else {
             $count = (int) $transient;
@@ -206,9 +209,21 @@ class Brizy_CSS_Fix {
 
         $s = $count === 1 ? '' : 's';
         echo '<div class="notice notice-warning">';
-        echo '<p><strong>Brizy CSS Fix:</strong> ' . $count . ' page' . $s . ' still referencing outdated CSS files. ';
-        echo 'These pages are working thanks to the workaround CSS files, but should be resaved in the Brizy editor for a permanent fix.</p>';
+        echo '<p><strong>Brizy CSS Fix:</strong> ' . $count . ' page' . $s . ' compiled by an older Brizy version. ';
+        echo 'These are rendering via the workaround CSS files. Resave each in the Brizy editor for a permanent fix.</p>';
         echo '</div>';
+    }
+
+    /**
+     * Brizy 2.8.x+ embeds CSS file paths in compiled-sections meta (base64 JSON).
+     * Older versions did not, so absence of any .css path = compiled by older Brizy
+     * and likely depending on the workaround CSS files.
+     */
+    private static function compiled_data_is_stale($compiled) {
+        if (!is_string($compiled) || $compiled === '') return false;
+        $decoded = base64_decode($compiled, true);
+        if (!is_string($decoded) || $decoded === '') return false;
+        return strpos($decoded, '.css') === false;
     }
 }
 
