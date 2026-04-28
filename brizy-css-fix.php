@@ -3,7 +3,7 @@
  * Plugin Name: Brizy CSS Fix
  * Plugin URI: https://github.com/ordinary82/brizy-css-fix
  * Description: Fixes broken layouts after Brizy 2.8.8+ updates by restoring missing CSS files and providing per-page compiled data clearing.
- * Version: 1.2.1
+ * Version: 1.2.3
  * Author: dustin.com.au
  * Author URI: https://dustin.com.au
  * GitHub Plugin URI: ordinary82/brizy-css-fix
@@ -15,6 +15,8 @@
 if (!defined('ABSPATH')) exit;
 
 class Brizy_CSS_Fix {
+
+    const VERSION = '1.2.3';
 
     private static $css_maps = [
         [
@@ -67,6 +69,7 @@ class Brizy_CSS_Fix {
             }
         }
         delete_option('brizy_css_fix_version');
+        delete_option('brizy_css_fix_plugin_version');
     }
 
     /**
@@ -75,10 +78,13 @@ class Brizy_CSS_Fix {
     public static function maybe_copy_css() {
         if (!defined('BRIZY_VERSION')) return;
 
-        $stored = get_option('brizy_css_fix_version', '');
-        if ($stored !== BRIZY_VERSION) {
+        $stored_brizy  = get_option('brizy_css_fix_version', '');
+        $stored_plugin = get_option('brizy_css_fix_plugin_version', '');
+
+        if ($stored_brizy !== BRIZY_VERSION || $stored_plugin !== self::VERSION) {
             self::copy_css_files();
             self::store_brizy_version();
+            update_option('brizy_css_fix_plugin_version', self::VERSION);
         }
     }
 
@@ -90,7 +96,7 @@ class Brizy_CSS_Fix {
         foreach (self::$css_maps as $map) {
             $src  = $plugin_dir . $map['src'];
             $dest = $plugin_dir . $map['dest'];
-            if (file_exists($src) && !file_exists($dest)) {
+            if (file_exists($src)) {
                 @copy($src, $dest);
             }
         }
