@@ -3,7 +3,7 @@
  * Plugin Name: Brizy CSS Fix
  * Plugin URI: https://github.com/ordinary82/brizy-css-fix
  * Description: Fixes broken layouts after Brizy 2.8.8+ updates by restoring missing CSS files and providing per-page compiled data clearing.
- * Version: 1.3.0
+ * Version: 1.3.1
  * Author: dustin.com.au
  * Author URI: https://dustin.com.au
  * GitHub Plugin URI: ordinary82/brizy-css-fix
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 class Brizy_CSS_Fix {
 
-    const VERSION = '1.3.0';
+    const VERSION = '1.3.1';
 
     private static $css_maps = [
         [
@@ -39,6 +39,7 @@ class Brizy_CSS_Fix {
         add_action('add_meta_boxes', [__CLASS__, 'add_meta_box']);
         add_action('admin_notices', [__CLASS__, 'handle_clear_action']);
         add_action('admin_notices', [__CLASS__, 'stale_css_warning']);
+        add_filter('default_hidden_meta_boxes', [__CLASS__, 'hide_meta_box_by_default']);
     }
 
     /**
@@ -115,6 +116,8 @@ class Brizy_CSS_Fix {
      * Add meta box to Brizy post edit screens.
      */
     public static function add_meta_box() {
+        if (!current_user_can('manage_options')) return;
+
         $screen = get_current_screen();
         if (!$screen) return;
 
@@ -168,10 +171,10 @@ class Brizy_CSS_Fix {
      */
     public static function handle_clear_action() {
         if (!isset($_GET['brizy_css_fix_clear']) || !isset($_GET['_bcf_nonce'])) return;
+        if (!current_user_can('manage_options')) return;
 
         $post_id = absint($_GET['brizy_css_fix_clear']);
         if (!wp_verify_nonce($_GET['_bcf_nonce'], 'brizy_css_fix_clear_' . $post_id)) return;
-        if (!current_user_can('edit_post', $post_id)) return;
 
         $deleted = delete_post_meta($post_id, 'brizy-compiled-sections');
         delete_transient('brizy_css_fix_stale_count');
@@ -212,6 +215,14 @@ class Brizy_CSS_Fix {
         echo '<p><strong>Brizy CSS Fix:</strong> ' . $count . ' page' . $s . ' compiled by an older Brizy version. ';
         echo 'These are rendering via the workaround CSS files. Resave each in the Brizy editor for a permanent fix.</p>';
         echo '</div>';
+    }
+
+    /**
+     * Hide the meta box by default — admins can re-show it via Screen Options.
+     */
+    public static function hide_meta_box_by_default($hidden) {
+        $hidden[] = 'brizy-css-fix';
+        return $hidden;
     }
 
     /**
