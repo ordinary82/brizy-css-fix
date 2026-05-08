@@ -3,7 +3,7 @@
  * Plugin Name: Brizy CSS Fix
  * Plugin URI: https://github.com/ordinary82/brizy-css-fix
  * Description: Fixes broken layouts after Brizy 2.8.8+ updates by restoring missing CSS files and providing per-page compiled data clearing.
- * Version: 1.3.2
+ * Version: 1.3.3
  * Author: dustin.com.au
  * Author URI: https://dustin.com.au
  * GitHub Plugin URI: ordinary82/brizy-css-fix
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) exit;
 
 class Brizy_CSS_Fix {
 
-    const VERSION = '1.3.2';
+    const VERSION = '1.3.3';
 
     private static $css_maps = [
         [
@@ -51,12 +51,12 @@ class Brizy_CSS_Fix {
     }
 
     /**
-     * On activation: copy CSS files and store the current Brizy version.
+     * On activation: copy CSS files and store current Brizy core + pro versions.
      */
     public static function on_activate() {
         if (!self::brizy_installed()) return;
         self::copy_css_files();
-        self::store_brizy_version();
+        self::store_brizy_versions();
     }
 
     /**
@@ -71,21 +71,29 @@ class Brizy_CSS_Fix {
             }
         }
         delete_option('brizy_css_fix_version');
+        delete_option('brizy_css_fix_pro_version');
         delete_option('brizy_css_fix_plugin_version');
     }
 
     /**
-     * On admin_init: re-copy CSS if Brizy was updated since last copy.
+     * On admin_init: re-copy CSS if Brizy core OR Pro was updated since last copy.
      */
     public static function maybe_copy_css() {
-        if (!defined('BRIZY_VERSION')) return;
+        if (!defined('BRIZY_VERSION') && !defined('BRIZY_PRO_VERSION')) return;
 
-        $stored_brizy  = get_option('brizy_css_fix_version', '');
-        $stored_plugin = get_option('brizy_css_fix_plugin_version', '');
+        $brizy     = defined('BRIZY_VERSION')     ? BRIZY_VERSION     : '';
+        $brizy_pro = defined('BRIZY_PRO_VERSION') ? BRIZY_PRO_VERSION : '';
 
-        if ($stored_brizy !== BRIZY_VERSION || $stored_plugin !== self::VERSION) {
+        $stored_brizy     = get_option('brizy_css_fix_version', '');
+        $stored_brizy_pro = get_option('brizy_css_fix_pro_version', '');
+        $stored_plugin    = get_option('brizy_css_fix_plugin_version', '');
+
+        if ($stored_brizy     !== $brizy
+         || $stored_brizy_pro !== $brizy_pro
+         || $stored_plugin    !== self::VERSION) {
             self::copy_css_files();
-            self::store_brizy_version();
+            update_option('brizy_css_fix_version',        $brizy);
+            update_option('brizy_css_fix_pro_version',    $brizy_pro);
             update_option('brizy_css_fix_plugin_version', self::VERSION);
             delete_transient('brizy_css_fix_stale_count');
         }
@@ -106,11 +114,11 @@ class Brizy_CSS_Fix {
     }
 
     /**
-     * Store the current Brizy version so we know when it updates.
+     * Store current Brizy core + pro versions so we know when either updates.
      */
-    private static function store_brizy_version() {
-        $version = defined('BRIZY_VERSION') ? BRIZY_VERSION : '';
-        update_option('brizy_css_fix_version', $version);
+    private static function store_brizy_versions() {
+        update_option('brizy_css_fix_version',     defined('BRIZY_VERSION')     ? BRIZY_VERSION     : '');
+        update_option('brizy_css_fix_pro_version', defined('BRIZY_PRO_VERSION') ? BRIZY_PRO_VERSION : '');
     }
 
     /**
